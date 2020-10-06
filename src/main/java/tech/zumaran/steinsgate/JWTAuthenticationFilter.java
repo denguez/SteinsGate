@@ -48,6 +48,7 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 		}
 		
 		String token = headerValue.replace(prefix, "");
+		
 		try {
 			Claims claims = Jwts.parser()
 					.setSigningKey(secret.getBytes())
@@ -61,12 +62,12 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 				
 				@SuppressWarnings("unchecked")
 				List<String> claimsAuthorities = (List<String>) claims.get("Authority");
+				
 				Set<GrantedAuthority> authorities = claimsAuthorities.stream()
 						.map(a -> new SimpleGrantedAuthority(a))
 						.collect(Collectors.toSet());
 				
-				UsernamePasswordAuthenticationToken auth = 
-						new UsernamePasswordAuthenticationToken(email, null, authorities);
+				final var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
 				
 				SecurityContextHolder.getContext().setAuthentication(auth);
 				

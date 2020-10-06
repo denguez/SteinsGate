@@ -27,20 +27,23 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 	
 	@Override
 	protected void configure(HttpSecurity http) throws Exception {
-		http
-		.csrf().disable()
+		http.cors()
+		.and()
+		.csrf()
+			.disable()
 		.sessionManagement()
 			.sessionCreationPolicy(SessionCreationPolicy.STATELESS) 	
 		.and()
 		.exceptionHandling()
 			.authenticationEntryPoint((req, resp, e) -> {
-				resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-				log.info(e.getMessage());
+				resp.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+				log.info("{} {}: {}", e.getMessage(), e.getClass().getSimpleName(), req.getRequestURL().toString());
 			}) 				
 		.and()
 		.addFilterAfter(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 		.authorizeRequests()
 			.antMatchers(HttpMethod.POST, "/navi/**").permitAll()
+			.antMatchers(HttpMethod.GET, "/").permitAll()
 			.anyRequest().authenticated(); 
   	}
 	
