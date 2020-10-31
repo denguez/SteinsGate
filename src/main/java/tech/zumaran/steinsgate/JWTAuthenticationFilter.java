@@ -18,11 +18,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.google.common.base.Optional;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
-import lombok.extern.slf4j.Slf4j;
 
-@Slf4j
 @Component
 public class JWTAuthenticationFilter extends OncePerRequestFilter {
 	
@@ -36,52 +36,43 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 	private String secret;
 	
 	@Override
-	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
-			FilterChain chain) throws ServletException, IOException {
-		
-		String headerValue = request.getHeader(header);
-		
-		if(headerValue == null || !headerValue.startsWith(prefix)) {
-			log.info("Invalid header {}", headerValue);
-			chain.doFilter(request, response);
-			return;
-		}
-		
-		String token = headerValue.replace(prefix, "");
-		
+	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) 
+			throws ServletException, IOException {
 		try {
-			Claims claims = Jwts.parser()
-					.setSigningKey(secret.getBytes())
-					.parseClaimsJws(token)
-					.getBody();
-			
-			String email = claims.getSubject();
-			
-			if(email != null) {
-				long contextId = (long) claims.get("id");
-				
-				@SuppressWarnings("unchecked")
-				List<String> claimsAuthorities = (List<String>) claims.get("Authority");
-				
-				Set<GrantedAuthority> authorities = claimsAuthorities.stream()
-						.map(a -> new SimpleGrantedAuthority(a))
-						.collect(Collectors.toSet());
-				
-				final var auth = new UsernamePasswordAuthenticationToken(email, null, authorities);
-				
-				SecurityContextHolder.getContext().setAuthentication(auth);
-				
-				request.setAttribute("contextId", contextId);
-				
-				log.info("User authenticated " + auth.getName() + " " 
-						+ claimsAuthorities.stream().collect(Collectors.joining(", ")));
+			final var maybeToken = parseToken(request.getHeader(header));
+			if (maybeToken.isPresent()) {
+				final var token = maybeToken.get();
+				SecurityContextHolder.getContext().setAuthentication(token);
+				request.setAttribute("contextId", token.getDetails());
 			}
-		} catch (Exception e) {
+		} catch(Exception e) {
 			SecurityContextHolder.clearContext();
-			log.info("Authentication exception. {}: {}", e.getClass().getSimpleName(), e.getMessage());
+		} finally {
+			chain.doFilter(request, response);
 		}
-		chain.doFilter(request, response);
 	}
 	
+	private Optional<UsernamePasswordAuthenticationToken> parseToken(String header) {
+		if (header != null && header.startsWith(prefix)) {
+			Claims claims = Jwts.parser()
+					.setSigningKey(secret.getBytes())
+					.parseClaimsJws(header.replace(prefix, ""))
+					.getBody();
+				
+			var auths = parseAuthorities(claims.get("Authority"));
+			var token = new UsernamePasswordAuthenticationToken(claims.getSubject(), null, auths);
+			token.setDetails(claims.get("id"));
+			return Optional.of(token);
+		} 
+		return Optional.absent();
+	}
+	
+	@SuppressWarnings("unchecked")
+	private static Set<GrantedAuthority> parseAuthorities(Object authorities) {
+		return ((List<String>) authorities).stream()
+				.map(a -> new SimpleGrantedAuthority(a))
+				.collect(Collectors.toSet());
+	}
+
 }
 

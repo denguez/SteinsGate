@@ -16,9 +16,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import lombok.extern.slf4j.Slf4j;
-
-@Slf4j
 @EnableWebSecurity
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 	
@@ -35,33 +32,27 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 			.sessionCreationPolicy(SessionCreationPolicy.STATELESS) 	
 		.and()
 		.exceptionHandling()
-			.authenticationEntryPoint((req, resp, e) -> {
-				resp.sendError(HttpServletResponse.SC_UNAUTHORIZED);
-				log.info("{} {}: {}", e.getMessage(), e.getClass().getSimpleName(), req.getRequestURL().toString());
+			.authenticationEntryPoint((req, res, e) -> {
+				res.sendError(HttpServletResponse.SC_UNAUTHORIZED, e.getMessage());
 			}) 				
 		.and()
 		.addFilterAfter(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 		.authorizeRequests()
 			.antMatchers(HttpMethod.POST, "/navi/**").permitAll()
-			.antMatchers(HttpMethod.GET, "/").permitAll()
 			.anyRequest().authenticated(); 
   	}
 	
 	@Bean
     public CorsConfigurationSource corsConfigurationSource() {
-    	final CorsConfiguration configuration = new CorsConfiguration();
-    	configuration.setAllowedOrigins(List.of("*"));
-    	configuration.setAllowedMethods(List.of("HEAD", "GET", "POST", "PUT", "DELETE"));
-        // setAllowCredentials(true) is important, otherwise:
-        // The value of the 'Access-Control-Allow-Origin' header in the response must not be the wildcard '*' when the request's credentials mode is 'include'.
-        configuration.setAllowCredentials(true);
-        // setAllowedHeaders is important! Without it, OPTIONS preflight request
-        // will fail with 403 Invalid CORS request
-        configuration.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type", "Connection"));
+    	final var config = new CorsConfiguration();
+    	config.setAllowedOrigins(List.of("*"));
+    	config.setAllowedMethods(List.of("HEAD", "GET", "POST", "PUT", "DELETE"));
+        config.setAllowCredentials(true);
+        config.setAllowedHeaders(List.of("Authorization", "Cache-Control", "Content-Type", "Connection"));
         
-        final UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
+        final var src = new UrlBasedCorsConfigurationSource();
+        src.registerCorsConfiguration("/**", config);
+        return src;
     }
 	
 }
